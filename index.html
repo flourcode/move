@@ -72,6 +72,8 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .brand{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-right:auto;display:flex;align-items:center;gap:8px}
 .dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
 .dot-live.off{background:var(--ink-3)}
+.dot-live.sync{background:var(--amber);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 .icon-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);transition:background .15s,color .15s}
 .icon-btn:hover{background:var(--sep);color:var(--ink)}
 .icon-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -273,47 +275,14 @@ button{background:none;border:0;cursor:pointer;padding:0}
 <!-- ══════════════════ connect ══════════════════ -->
 <div class="connect" id="connect">
   <div class="wrap">
-
-    <div class="pane" id="paneLock">
-      <h1>OLEA Move In</h1>
-      <p class="lede">Enter the passcode to open the move-in plan. You only have to do this once on this device.</p>
-      <div id="lockErr"></div>
-      <div class="fieldset">
-        <div class="field"><label for="lockIn">Passcode</label><input id="lockIn" type="password" placeholder="Required" autocomplete="current-password" spellcheck="false"></div>
-      </div>
-      <button class="btn" id="lockGo">Unlock</button>
-      <button class="btn quiet" id="lockDemo">Look around with sample data</button>
+    <h1>Connection</h1>
+    <p class="lede">Linked to your Google Sheet. Every change you make here saves straight into it.</p>
+    <div class="fieldset">
+      <div class="field"><label>Tab</label><span class="val" id="acctSheet">—</span></div>
+      <div class="field"><label>Items</label><span class="val" id="acctCount">—</span></div>
+      <div class="field"><label>Loaded</label><span class="val" id="acctTime">—</span></div>
     </div>
-
-    <div class="pane" id="paneAccount">
-      <h1>Connection</h1>
-      <p class="lede">Linked to your Google Sheet. Every change you make here saves straight into it.</p>
-      <div class="fieldset">
-        <div class="field"><label>Tab</label><span class="val" id="acctSheet">—</span></div>
-        <div class="field"><label>Items</label><span class="val" id="acctCount">—</span></div>
-        <div class="field"><label>Loaded</label><span class="val" id="acctTime">—</span></div>
-      </div>
-      <button class="btn" id="acctDone">Done</button>
-      <button class="btn quiet" id="acctForget">Forget passcode on this device</button>
-    </div>
-
-    <div class="pane" id="paneSetup">
-      <h1>Connect your sheet</h1>
-      <p class="lede">This app reads and writes the “Move-In Purchases” tab directly. Deploy the included script once, then paste its address below.</p>
-      <div id="connectErr"></div>
-      <ol class="steps">
-        <li>In your spreadsheet, open <b>Extensions ▸ Apps Script</b> and paste in <code>Code.gs</code>.</li>
-        <li>Click <b>Deploy ▸ New deployment ▸ Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>.</li>
-        <li>Authorise it, then copy the web app URL — it ends in <code>/exec</code>.</li>
-      </ol>
-      <div class="fieldset">
-        <div class="field"><label for="urlIn">Web app URL</label><input id="urlIn" type="url" placeholder="https://script.google.com/…/exec" spellcheck="false"></div>
-        <div class="field"><label for="tokIn">Passcode</label><input id="tokIn" type="text" placeholder="Optional" spellcheck="false"></div>
-      </div>
-      <button class="btn" id="connectGo">Connect</button>
-      <button class="btn ghost" id="connectDemo">Browse the sample data instead</button>
-    </div>
-
+    <button class="btn" id="acctDone">Done</button>
   </div>
 </div>
 
@@ -386,10 +355,6 @@ button{background:none;border:0;cursor:pointer;padding:0}
    ════════════════════════════════════════════════════════════════ */
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyK_lAPst3z1zkvN81XDns2WWGnsEZFuxNYqjBT-jL6INezn7Y9KSkxQIBjT-ul1Cbnww/exec';
 
-/*  Leave this empty. The passcode is typed in by each person once and
-    kept on their own device — putting it here would publish it.       */
-const ACCESS_CODE = '';
-
 /* ─────────────────────────  config  ───────────────────────── */
 const H = {
   room:'Room / Space', item:'Item Description', category:'Category', brand:'Brand Name',
@@ -421,7 +386,7 @@ const GLYPH = {
 
 /* ─────────────────────────  state  ───────────────────────── */
 let state = {
-  url:'', token:'', demo:false, loading:false, locked:true, loadedAt:null, sheetName:'',
+  url:'', loading:false, loadedAt:null, sheetName:'',
   headers:[], items:[], closing:'',
   filter:'all', query:'', dateFilter:'', editing:null
 };
@@ -466,8 +431,7 @@ function toast(msg,bad){
 
 /* ─────────────────────────  api  ───────────────────────── */
 async function api(action, payload){
-  if(state.demo) return demoApi(action,payload);
-  const body = Object.assign({action, token:state.token}, payload||{});
+  const body = Object.assign({action}, payload||{});
   const res = await fetch(state.url, {
     method:'POST', redirect:'follow',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -479,7 +443,6 @@ async function api(action, payload){
   catch(e){ throw new Error('That URL didn’t return sheet data. Make sure it ends in /exec.'); }
   if(!json.ok){
     const e = new Error(json.error||'The sheet rejected that change.');
-    e.needAuth = !!json.needAuth;
     throw e;
   }
   return json.data;
@@ -499,45 +462,17 @@ async function load(silent){
   $('#refresh').firstElementChild.classList.add('spin');
   try{
     absorb(await api('list'));
-    state.locked = false; state.loadedAt = new Date();
+    state.loadedAt = new Date();
     showApp(); closeConnect();
-    $('#live').classList.toggle('off', state.demo);
-    if(!silent) toast(state.demo ? 'Showing sample data' : 'Up to date with the sheet');
+    $('#live').classList.remove('off');
+    if(!silent) toast('Up to date with the sheet');
   }catch(err){
     if(state.items.length) toast(err.message, true);
-    else if(err.needAuth) openConnect('lock', state.token ? err.message : '');
-    else openConnect('setup', err.message);
+    else showError(err.message);
   }finally{
     state.loading=false;
     $('#refresh').firstElementChild.classList.remove('spin');
   }
-}
-
-/* ─────────────────────────  demo  ───────────────────────── */
-const DEMO_ROWS = [
-  ['Kitchen','French Door Smart Refrigerator (Counter-Depth)','Major Appliance','LG Electronics','BestBuy.com','High - Essential',4499,'2026-09-01','2026-10-06','Ordered'],
-  ['Laundry','Front Load Washer & Electric Dryer Set','Major Appliance','Electrolux','HomeDepot.com','High - Essential',1898,'2026-09-05','2026-10-07','Ordered'],
-  ['Primary Bedroom','Solid Wood Upholstered King Bed Frame','Furniture','Article','Article.com','High - Essential',2299,'2026-09-02','2026-10-06','In Transit'],
-  ['Primary Bedroom','Matching 2-Drawer Nightstands (Set of 2)','Furniture','West Elm','WestElm.com','Medium',798,'2026-09-15','2026-10-09','Ordered'],
-  ['Living Room','4-Piece Performance Fabric Sectional Sofa','Furniture','Pottery Barn','PotteryBarn.com','High - Essential',3499,'2026-08-20','2026-10-07','Ordered'],
-  ['Living Room','65-Inch 4K OLED Smart TV','Electronics','Sony','BestBuy.com','Medium',1699,'2026-09-18','2026-10-08','Not Ordered'],
-  ['Living Room','Round Travertine Coffee Table','Furniture','CB2','CB2.com','Low',649,'2026-09-22','2026-10-12','Not Ordered'],
-  ['Kitchen','Leather Counter Height Stools (Set of 3)','Furniture','Target Project 62','Target.com','Low',1490,'2026-09-25','2026-10-11','Not Ordered'],
-  ['Ceiling Fans','Fans','Smart Home','Unknown','Amazon.com','High - Essential',1299,'2026-09-12','2026-10-05','Delivered'],
-  ['Patio','Pool Furniture','Furniture','Unknown','Costco','High - Essential',3449,'2026-09-12','2026-10-05','Delivered']
-];
-let demoStore = null;
-function demoApi(action,p){
-  const heads = Object.values(H);
-  if(!demoStore){
-    demoStore = DEMO_ROWS.map((r,i)=>{
-      const cells={}; heads.forEach((h,j)=>cells[h]=r[j]); return {row:8+i, cells};
-    });
-  }
-  if(action==='create'){ demoStore.push({row: Date.now(), cells: p.item.cells}); }
-  if(action==='update'){ const t=demoStore.find(x=>x.row===p.item.row); if(t) t.cells=p.item.cells; }
-  if(action==='delete'){ demoStore = demoStore.filter(x=>x.row!==p.item.row); }
-  return Promise.resolve({headers:heads, items:JSON.parse(JSON.stringify(demoStore)), closingDate:'2026-10-06'});
 }
 
 /* ─────────────────────────  render  ───────────────────────── */
@@ -571,7 +506,6 @@ function renderHero(){
     `<span><em style="background:var(${statusVar(g.s)})"></em>${esc(g.s)} <b>${money(g.sum)}</b></span>`).join('');
 
   renderRunway(close);
-  renderBanner();
 }
 
 function renderRunway(close){
@@ -632,14 +566,6 @@ function renderRunway(close){
   note.textContent = soon
     ? `Next delivery ${fmtDay(soon.d)} — ${get(soon.i,'item')}.` + (late.length?` ${late.length} ${late.length===1?'item lands':'items land'} after closing.`:'')
     : 'No upcoming deliveries scheduled.';
-}
-
-function renderBanner(){
-  const b=$('#banner');
-  if(state.demo){
-    b.innerHTML = `<div class="banner">Sample data — edits stay in this browser.<button id="bconnect">Connect sheet</button></div>`;
-    $('#bconnect').onclick = ()=>openConnect();
-  } else b.innerHTML='';
 }
 
 function renderChips(){
@@ -784,125 +710,85 @@ function bindSeg(sel,key){
 function openSheet(){ $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeSheet(){ $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open'); document.body.style.overflow=''; state.editing=null; }
 
-async function save(){
+let inflight = 0;
+function busy(on){
+  inflight = Math.max(0, inflight + (on ? 1 : -1));
+  $('#live').classList.toggle('sync', inflight > 0);
+}
+
+/** Applies the change immediately, then pushes it. Rolls back if the sheet refuses. */
+async function push(action, payload, rollback, okMsg){
+  busy(true);
+  try{
+    absorb(await api(action, payload));
+    if(okMsg) toast(okMsg);
+  }catch(err){
+    state.items = rollback; render();
+    toast(err.message, true);
+  }finally{ busy(false); }
+}
+
+function save(){
   const e = state.editing; if(!e) return;
   const desc = String(e.cells[H.item]||'').trim();
   if(!desc){ toast('Give the item a name first', true); $('#f_item').focus(); return; }
   e.cells[H.price] = num(e.cells[H.price]);
-  const btn=$('#save'); btn.disabled=true; btn.textContent='Saving…';
-  try{
-    const payload = {item:{row:e.row, match:e._match||desc, cells:e.cells}};
-    absorb(await api(e.row ? 'update' : 'create', payload));
-    closeSheet(); toast(e.row?'Saved to the sheet':'Added to the sheet');
-  }catch(err){ toast(err.message, true); }
-  finally{ btn.disabled=false; btn.textContent='Save'; }
+
+  const rollback = JSON.parse(JSON.stringify(state.items));
+  const isNew = !e.row;
+  if(isNew) state.items.push({row:-Date.now(), cells:e.cells});
+  else {
+    const t = state.items.find(i=>i.row===e.row);
+    if(t) t.cells = e.cells;
+  }
+  closeSheet(); render();
+  push(isNew?'create':'update',
+       {item:{row:isNew?null:e.row, match:e._match||desc, cells:e.cells}},
+       rollback, isNew?'Added to the sheet':'Saved to the sheet');
 }
 
-async function remove(item){
+function remove(item){
   if(!confirm(`Remove “${get(item,'item')}” from the sheet? This deletes the row.`)) return;
-  try{
-    absorb(await api('delete', {item:{row:item.row, match:get(item,'item')}}));
-    closeSheet(); toast('Removed from the sheet');
-  }catch(err){ toast(err.message, true); }
+  const rollback = JSON.parse(JSON.stringify(state.items));
+  state.items = state.items.filter(i=>i.row!==item.row);
+  closeSheet(); render();
+  push('delete', {item:{row:item.row, match:get(item,'item')}}, rollback, 'Removed from the sheet');
 }
 
-async function cycleStatus(row){
+function cycleStatus(row){
   const item = state.items.find(i=>i.row===row); if(!item) return;
   const next = STATUSES[(STATUSES.findIndex(s=>norm(s)===norm(get(item,'status')))+1+STATUSES.length)%STATUSES.length];
-  const cells = Object.assign({}, item.cells);
-  for(const k in cells){ if(norm(k)===norm(H.status)) cells[k]=next; }
-  if(!Object.keys(cells).some(k=>norm(k)===norm(H.status))) cells[H.status]=next;
+  const rollback = JSON.parse(JSON.stringify(state.items));
 
-  item.cells = cells; render();                      // optimistic
-  try{
-    absorb(await api('update',{item:{row, match:get(item,'item'), cells}}));
-    toast(`Marked ${next.toLowerCase()}`);
-  }catch(err){ toast(err.message,true); load(true); }
+  const cells = Object.assign({}, item.cells);
+  let hit = false;
+  for(const k in cells){ if(norm(k)===norm(H.status)){ cells[k]=next; hit=true; } }
+  if(!hit) cells[H.status] = next;
+  item.cells = cells; render();
+
+  push('update', {item:{row, match:get(item,'item'), cells}}, rollback);
 }
 
-/* ─────────────────────────  connect flow  ───────────────────────── */
-function openConnect(mode, msg){
-  mode = mode || (SCRIPT_URL ? (state.locked ? 'lock' : 'account') : 'setup');
-  ['Lock','Account','Setup'].forEach(n=>
-    $('#pane'+n).classList.toggle('on', n.toLowerCase()===mode));
-
-  if(mode==='lock'){
-    $('#lockErr').innerHTML = msg ? `<div class="err">${esc(msg)}</div>` : '';
-    setTimeout(()=>$('#lockIn').focus(), 120);
-  }
-  if(mode==='setup'){
-    $('#connectErr').innerHTML = msg ? `<div class="err">${esc(msg)}</div>` : '';
-    $('#urlIn').value = state.url; $('#tokIn').value = state.token;
-  }
-  if(mode==='account'){
-    $('#acctSheet').textContent = state.demo ? 'Sample data' : (state.sheetName||'Move-In Purchases');
-    $('#acctCount').textContent = state.items.length;
-    $('#acctTime').textContent = state.loadedAt
-      ? state.loadedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
-  }
+/* ─────────────────────────  status panel  ───────────────────────── */
+function openConnect(){
+  $('#acctSheet').textContent = state.sheetName || 'Move-In Purchases';
+  $('#acctCount').textContent = state.items.length;
+  $('#acctTime').textContent = state.loadedAt
+    ? state.loadedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
   $('#connect').classList.add('show');
   document.body.style.overflow='hidden';
 }
 function closeConnect(){ $('#connect').classList.remove('show'); document.body.style.overflow=''; }
 
-async function unlock(){
-  const code = $('#lockIn').value.trim();
-  if(!code){ $('#lockIn').focus(); return; }
-  const btn=$('#lockGo'); btn.disabled=true; btn.textContent='Checking…';
-  state.token = code; state.demo = false;
-  try{
-    absorb(await api('list'));
-    store.set('olea_token', code);
-    state.locked=false; state.loadedAt=new Date();
-    closeConnect(); showApp(); $('#live').classList.remove('off');
-    toast('Welcome back');
-  }catch(err){
-    state.token='';
-    $('#lockErr').innerHTML = `<div class="err">${esc(err.message)}</div>`;
-    $('#lockIn').select();
-  }finally{ btn.disabled=false; btn.textContent='Unlock'; }
-}
-
-function forget(){
-  store.set('olea_token',''); store.set('olea_url','');
-  location.reload();
-}
-
-async function connect(){
-  const url = $('#urlIn').value.trim();
-  if(!/^https:\/\/script\.google\.com\/.*\/exec/.test(url)){
-    $('#connectErr').innerHTML = `<div class="err">That doesn’t look like a web app URL. It should start with https://script.google.com and end with /exec.</div>`;
-    return;
-  }
-  const btn=$('#connectGo'); btn.disabled=true; btn.textContent='Connecting…';
-  const prev = {url:state.url, token:state.token, demo:state.demo};
-  state.url = url; state.token = $('#tokIn').value.trim(); state.demo = false;
-  try{
-    absorb(await api('list'));
-    store.set('olea_url', state.url); store.set('olea_token', state.token);
-    state.locked=false; state.loadedAt=new Date();
-    $('#live').classList.remove('off');
-    closeConnect(); showApp(); toast('Connected to your sheet');
-  }catch(err){
-    Object.assign(state, prev);
-    $('#connectErr').innerHTML = `<div class="err">${esc(err.message)}</div>`;
-  }finally{ btn.disabled=false; btn.textContent='Connect'; }
+function showError(msg){
+  $('#list').innerHTML = `<div class="card" style="margin-top:26px"><div class="empty">
+    <h3>Can’t reach your sheet</h3><p>${esc(msg)}</p></div></div>`;
 }
 
 function showApp(){ $('#app').hidden=false; $('#add').hidden=false; }
 
 /* ─────────────────────────  wiring  ───────────────────────── */
-$('#connectGo').addEventListener('click', connect);
-$('#urlIn').addEventListener('keydown', e=>{ if(e.key==='Enter') connect(); });
-const goDemo = ()=>{ state.demo=true; state.token=''; closeConnect(); showApp(); load(); };
-$('#connectDemo').addEventListener('click', goDemo);
-$('#lockDemo').addEventListener('click', goDemo);
-$('#lockGo').addEventListener('click', unlock);
-$('#lockIn').addEventListener('keydown', e=>{ if(e.key==='Enter') unlock(); });
 $('#acctDone').addEventListener('click', closeConnect);
-$('#acctForget').addEventListener('click', ()=>{
-  if(confirm('Forget the passcode on this device? You’ll need to type it in again.')) forget();
-});
 $('#settings').addEventListener('click', ()=>openConnect());
 $('#refresh').addEventListener('click', ()=>load());
 $('#add').addEventListener('click', ()=>openEditor(null));
@@ -920,10 +806,13 @@ addEventListener('scroll', ()=>$('#bar').classList.toggle('stuck', scrollY>8), {
 
 /* boot */
 (function(){
-  state.url = SCRIPT_URL || store.get('olea_url');
-  state.token = ACCESS_CODE || store.get('olea_token');
-  if(!state.url){ openConnect('setup'); return; }
-  showApp(); $('#app').classList.add('boot');
+  state.url = SCRIPT_URL;
+  showApp();
+  if(!state.url){
+    showError('Open index.html, find the line that starts with const SCRIPT_URL, and paste your Apps Script /exec address between the quotes.');
+    return;
+  } $('#app').classList.add('boot');
+  $('#app').classList.add('boot');
   $('#list').innerHTML = `<div class="card" style="margin-top:26px"><div class="empty">
     <h3>Opening your plan</h3><p>Fetching the latest from your sheet.</p></div></div>`;
   load(true).then(()=>{ if(state.items.length) $('#live').classList.remove('off'); });

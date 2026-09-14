@@ -1,20 +1,14 @@
 /**
  * OLEA Move In — Sheet API
  * ---------------------------------------------------------------
- * Paste this into Extensions ▸ Apps Script in your spreadsheet,
- * then Deploy ▸ New deployment ▸ Web app
- *   Execute as:      Me
- *   Who has access:  Anyone
- * Copy the /exec URL into the app.
+ * Paste into Extensions ▸ Apps Script, then Deploy ▸ New deployment
+ * ▸ Web app (Execute as: Me · Who has access: Anyone).
  *
- * The script writes into the existing table (header row is found by
- * searching for "Room / Space"), keeps your totals row intact, and
- * never overwrites a cell that contains a formula.
+ * Reads the sheet in two calls and writes a whole row in one, rather
+ * than touching cells one at a time. Formulas are never overwritten.
  */
 
-// Leave this empty and the app opens with no passcode — that's the
-// default. If you ever want to lock it down, put any string here,
-// redeploy a new version, and the app will start asking for it.
+// Leave empty for no passcode. Put any string here to require one.
 const API_TOKEN = '';
 
 const SHEET_NAME = 'Move-In Purchases';
@@ -40,12 +34,7 @@ function route(e) {
     }
 
     if (API_TOKEN && String(p.token || '') !== API_TOKEN) {
-      return ContentService
-        .createTextOutput(JSON.stringify({
-          ok: false, needAuth: true,
-          error: p.token ? 'That passcode doesn\u2019t match.' : 'This plan is passcode protected.'
-        }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return json_({ ok: false, needAuth: true, error: 'Passcode required.' });
     }
 
     var action = p.action || 'list';
@@ -53,17 +42,22 @@ function route(e) {
     if (typeof item === 'string' && item) item = JSON.parse(item);
 
     if (action === 'list') {
-      out = { ok: true, data: readAll() };
+      out = { ok: true, data: readAll(layout_()) };
     } else {
       var lock = LockService.getScriptLock();
       lock.waitLock(20000);
       try {
-        if (action === 'create')      { createRow(item); }
-        else if (action === 'update') { updateRow(item); }
-        else if (action === 'delete') { deleteRow(item); }
-        else { throw new Error('Unknown action: ' + action); }
-        refreshTotals();
-        out = { ok: true, data: readAll() };
+        var L = layout_();
+        if (action === 'update') {
+          updateRow_(L, item);         // same rows, grid patched in place
+        } else if (action === 'create' || action === 'delete') {
+          if (action === 'create') createRow_(L, item); else deleteRow_(L, item);
+          L = layout_();               // rows shifted, so re-read once
+        } else {
+          throw new Error('Unknown action: ' + action);
+        }
+        refreshTotals_(L);
+        out = { ok: true, data: readAll(L) };
       } finally {
         lock.releaseLock();
       }
@@ -71,7 +65,11 @@ function route(e) {
   } catch (err) {
     out = { ok: false, error: String(err && err.message ? err.message : err) };
   }
-  return ContentService.createTextOutput(JSON.stringify(out))
+  return json_(out);
+}
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -82,12 +80,17 @@ function sheet_() {
   return ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
 }
 
-/** Locates the header row, the column block, and the data extent. */
+/**
+ * Two service calls total — the value grid and the formula grid.
+ * Everything downstream reads from these in memory.
+ */
 function layout_() {
   var sh = sheet_();
-  var grid = sh.getDataRange().getValues();
-  var hr = -1, c0 = -1;
+  var rng = sh.getDataRange();
+  var grid = rng.getValues();
+  var fx = rng.getFormulas();
 
+  var hr = -1, c0 = -1;
   for (var r = 0; r < Math.min(grid.length, 40) && hr < 0; r++) {
     for (var c = 0; c < grid[r].length; c++) {
       if (norm_(grid[r][c]) === norm_(HEADER_ANCHOR)) { hr = r; c0 = c; break; }
@@ -109,75 +112,70 @@ function layout_() {
     if (/^total\b/i.test(room)) { totalRow = d; break; }
     if (!room && !desc) { if (++blanks >= 5) break; continue; }
     blanks = 0;
-    rows.push(d);
+    rows.push(d + 1);
     last = d;
   }
 
+  var idx = {};
+  for (var i = 0; i < headers.length; i++) idx[norm_(headers[i])] = c0 + 1 + i;
+
   return {
-    sheet: sh, grid: grid, headers: headers,
-    headerRow: hr + 1, col0: c0 + 1,
-    dataRows: rows.map(function (i) { return i + 1; }),
-    lastRow: last + 1,
-    totalRow: totalRow < 0 ? -1 : totalRow + 1
+    sheet: sh, grid: grid, fx: fx, headers: headers, idx: idx,
+    headerRow: hr + 1, col0: c0 + 1, n: headers.length,
+    dataRows: rows, lastRow: last + 1,
+    totalRow: totalRow < 0 ? -1 : totalRow + 1,
+    tz: SpreadsheetApp.getActive().getSpreadsheetTimeZone()
   };
 }
 
 function norm_(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase(); }
-
-function colOf_(L, header) {
-  for (var i = 0; i < L.headers.length; i++) {
-    if (norm_(L.headers[i]) === norm_(header)) return L.col0 + i;
-  }
-  return -1;
+function colOf_(L, header) { return L.idx[norm_(header)] || -1; }
+function cellAt_(L, row, col) { return L.grid[row - 1][col - 1]; }
+function fxAt_(L, row, col) {
+  var r = L.fx[row - 1];
+  return r ? (r[col - 1] || '') : '';
 }
 
 /* ============================= read ============================= */
 
-function readAll() {
-  var L = layout_();
-  var tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
-  var n = L.headers.length;
+function readAll(L) {
   var items = [];
-
   for (var i = 0; i < L.dataRows.length; i++) {
     var row = L.dataRows[i];
-    var vals = L.sheet.getRange(row, L.col0, 1, n).getValues()[0];
     var cells = {};
-    for (var j = 0; j < n; j++) cells[L.headers[j]] = cellOut_(vals[j], tz);
+    for (var j = 0; j < L.n; j++) cells[L.headers[j]] = out_(L.grid[row - 1][L.col0 - 1 + j], L.tz);
     items.push({ row: row, cells: cells });
   }
-
   return {
     sheetName: L.sheet.getName(),
     headers: L.headers,
     items: items,
-    closingDate: findClosingDate_(L, tz),
-    updated: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss")
+    closingDate: findClosingDate_(L),
+    updated: Utilities.formatDate(new Date(), L.tz, "yyyy-MM-dd'T'HH:mm:ss")
   };
 }
 
-function cellOut_(v, tz) {
+function out_(v, tz) {
   if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
-  if (v === null || v === undefined) return '';
-  return v;
+  return (v === null || v === undefined) ? '' : v;
 }
 
-/** Reads "Target Closing: Oct 6, 2026" from the dashboard block. */
-function findClosingDate_(L, tz) {
+function findClosingDate_(L) {
   for (var r = 0; r < L.headerRow - 1; r++) {
     var line = L.grid[r] || [];
     for (var c = 0; c < line.length; c++) {
       var raw = line[c];
       if (raw instanceof Date) {
-        var near = String(line[c - 1] || '') + String(line[c - 2] || '');
-        if (/closing/i.test(near)) return Utilities.formatDate(raw, tz, 'yyyy-MM-dd');
+        if (/closing/i.test(String(line[c - 1] || '') + String(line[c - 2] || ''))) {
+          return Utilities.formatDate(raw, L.tz, 'yyyy-MM-dd');
+        }
       }
       var s = String(raw || '');
       if (/closing/i.test(s)) {
         var m = s.match(/([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})|(\d{4}-\d{2}-\d{2})/);
         if (m) {
           var d = new Date(m[0]);
-          if (!isNaN(d.getTime())) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+          if (!isNaN(d.getTime())) return Utilities.formatDate(d, L.tz, 'yyyy-MM-dd');
         }
       }
     }
@@ -187,146 +185,151 @@ function findClosingDate_(L, tz) {
 
 /* ============================ writes ============================ */
 
-function createRow(item) {
+/** One setValues call for the whole row. Formulas are written back untouched. */
+function writeRow_(L, row, cells, fresh) {
+  var byHeader = {};
+  for (var k in cells) byHeader[norm_(k)] = cells[k];
+
+  var out = [];
+  for (var i = 0; i < L.n; i++) {
+    var col = L.col0 + i;
+    var f = fresh ? '' : fxAt_(L, row, col);
+    if (f) { out.push(f); continue; }             // put the formula straight back
+    var h = L.headers[i];
+    var key = norm_(h);
+    if (byHeader.hasOwnProperty(key)) out.push(coerce_(h, byHeader[key]));
+    else out.push(fresh ? '' : cellAt_(L, row, col));
+  }
+  L.sheet.getRange(row, L.col0, 1, L.n).setValues([out]);
+
+  // keep the cached grid honest so totals and the reply reflect this write
+  if (L.grid[row - 1]) {
+    for (var j = 0; j < L.n; j++) {
+      var cj = L.col0 + j;
+      if (!fresh && fxAt_(L, row, cj)) continue;   // computed value is unknown
+      L.grid[row - 1][cj - 1] = out[j];
+    }
+  }
+}
+
+function createRow_(L, item) {
   if (!item) throw new Error('No item supplied.');
-  var L = layout_();
-  var at = L.lastRow;                      // last populated data row
-  L.sheet.insertRowsAfter(at, 1);          // pushes the totals row down
-  var target = at + 1;
-  L.sheet.getRange(at, L.col0, 1, L.headers.length)
-    .copyTo(L.sheet.getRange(target, L.col0, 1, L.headers.length), { formatOnly: true });
-  writeCells_(L, target, item.cells);
+  var at = L.lastRow;
+  L.sheet.insertRowsAfter(at, 1);
+  L.sheet.getRange(at, L.col0, 1, L.n)
+    .copyTo(L.sheet.getRange(at + 1, L.col0, 1, L.n), { formatOnly: true });
+  writeRow_(L, at + 1, item.cells, true);
 }
 
-function updateRow(item) {
+function updateRow_(L, item) {
   if (!item) throw new Error('No item supplied.');
-  var L = layout_();
-  var row = resolveRow_(L, item);
-  writeCells_(L, row, item.cells);
+  writeRow_(L, resolveRow_(L, item), item.cells, false);
 }
 
-function deleteRow(item) {
-  var L = layout_();
-  var row = resolveRow_(L, item);
-  L.sheet.deleteRow(row);
+function deleteRow_(L, item) {
+  L.sheet.deleteRow(resolveRow_(L, item));
 }
 
-/**
- * Trusts the row number only if the description still matches.
- * Otherwise re-finds the item — so a stale tab can't clobber the wrong line.
- */
+/** Trusts the row number only while the description still matches. */
 function resolveRow_(L, item) {
   var descCol = colOf_(L, DESC_HEADER);
   var want = norm_(item.match || (item.cells ? item.cells[DESC_HEADER] : ''));
   var row = Number(item.row || 0);
 
-  if (row && L.dataRows.indexOf(row) > -1) {
+  if (row > 0 && L.dataRows.indexOf(row) > -1) {
     if (!want) return row;
-    if (descCol > 0 && norm_(L.sheet.getRange(row, descCol).getValue()) === want) return row;
+    if (descCol > 0 && norm_(cellAt_(L, row, descCol)) === want) return row;
   }
   if (want && descCol > 0) {
     for (var i = 0; i < L.dataRows.length; i++) {
-      if (norm_(L.sheet.getRange(L.dataRows[i], descCol).getValue()) === want) return L.dataRows[i];
+      if (norm_(cellAt_(L, L.dataRows[i], descCol)) === want) return L.dataRows[i];
     }
   }
   throw new Error('That row is no longer in the sheet. Refresh and try again.');
 }
 
-function writeCells_(L, row, cells) {
-  if (!cells) return;
-  for (var header in cells) {
-    var col = colOf_(L, header);
-    if (col < 0) continue;
-    var cell = L.sheet.getRange(row, col);
-    if (cell.getFormula()) continue;                 // never stomp a formula
-    cell.setValue(coerce_(header, cells[header]));
-  }
-}
-
 function coerce_(header, value) {
   var s = String(value == null ? '' : value).trim();
   if (s === '') return '';
-
   if (norm_(header).indexOf('date') > -1) {
     var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return s;
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : s;
   }
   if (norm_(header) === norm_(PRICE_HEADER)) {
-    var num = Number(s.replace(/[^0-9.\-]/g, ''));
-    return isNaN(num) ? s : num;
+    var n = Number(s.replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? s : n;
   }
   return value;
 }
 
 /* =========================== totals =========================== */
 
-/** Refreshes the dashboard strip and totals row — formulas are left alone. */
-function refreshTotals() {
-  var L = layout_();
+/** Counts from the in-memory grid, then writes only the summary cells. */
+function refreshTotals_(L) {
   var priceCol = colOf_(L, PRICE_HEADER);
   var statusCol = colOf_(L, STATUS_HEADER);
   var prioCol = colOf_(L, PRIORITY_HEADER);
+  var total = 0, delivered = 0, pending = 0, essential = 0;
+  var count = L.dataRows.length;
 
-  var total = 0, delivered = 0, pending = 0, essential = 0, count = L.dataRows.length;
-
-  for (var i = 0; i < L.dataRows.length; i++) {
+  for (var i = 0; i < count; i++) {
     var r = L.dataRows[i];
     if (priceCol > 0) {
-      var p = Number(String(L.sheet.getRange(r, priceCol).getValue()).replace(/[^0-9.\-]/g, ''));
+      var p = Number(String(cellAt_(L, r, priceCol)).replace(/[^0-9.\-]/g, ''));
       if (!isNaN(p)) total += p;
     }
     if (statusCol > 0) {
-      var st = norm_(L.sheet.getRange(r, statusCol).getValue());
+      var st = norm_(cellAt_(L, r, statusCol));
       if (st === 'delivered') delivered++;
       else if (st === 'ordered' || st === 'in transit') pending++;
     }
-    if (prioCol > 0 && /essential/i.test(String(L.sheet.getRange(r, prioCol).getValue()))) essential++;
+    if (prioCol > 0 && /essential/i.test(String(cellAt_(L, r, prioCol)))) essential++;
   }
 
   var days = '';
-  var closing = findClosingDate_(L, SpreadsheetApp.getActive().getSpreadsheetTimeZone());
+  var closing = findClosingDate_(L);
   if (closing) {
-    var cm = closing.split('-');
-    var cd = new Date(Number(cm[0]), Number(cm[1]) - 1, Number(cm[2]));
+    var c = closing.split('-');
+    var cd = new Date(Number(c[0]), Number(c[1]) - 1, Number(c[2]));
     var today = new Date(); today.setHours(0, 0, 0, 0);
     days = Math.max(0, Math.round((cd - today) / 86400000)) + ' Days';
   }
 
-  setUnderLabel_(L, 'days until closing', days);
-  setUnderLabel_(L, 'total estimated spend', total);
-  setUnderLabel_(L, 'essential items', essential + ' Items');
-  setUnderLabel_(L, 'delivered', delivered + ' of ' + count);
-  setUnderLabel_(L, 'orders pending', pending + ' Pending');
+  put_(L, 'days until closing', days);
+  put_(L, 'total estimated spend', total);
+  put_(L, 'essential items', essential + ' Items');
+  put_(L, 'delivered', delivered + ' of ' + count);
+  put_(L, 'orders pending', pending + ' Pending');
 
   if (L.totalRow > 0) {
-    if (priceCol > 0) setIfNotFormula_(L.sheet.getRange(L.totalRow, priceCol), total);
-    if (statusCol > 0) setIfNotFormula_(L.sheet.getRange(L.totalRow, statusCol), delivered + ' of ' + count + ' Delivered');
+    if (priceCol > 0 && !fxAt_(L, L.totalRow, priceCol)) {
+      L.sheet.getRange(L.totalRow, priceCol).setValue(total);
+    }
+    if (statusCol > 0 && !fxAt_(L, L.totalRow, statusCol)) {
+      L.sheet.getRange(L.totalRow, statusCol).setValue(delivered + ' of ' + count + ' Delivered');
+    }
   }
 }
 
-function setUnderLabel_(L, label, value) {
+/** Writes under a dashboard label, skipping any cell holding a formula. */
+function put_(L, label, value) {
   for (var r = 0; r < L.headerRow - 1; r++) {
     var line = L.grid[r] || [];
     for (var c = 0; c < line.length; c++) {
       if (norm_(line[c]) === label) {
-        setIfNotFormula_(L.sheet.getRange(r + 2, c + 1), value);
+        if (!fxAt_(L, r + 2, c + 1)) L.sheet.getRange(r + 2, c + 1).setValue(value);
         return;
       }
     }
   }
 }
 
-function setIfNotFormula_(range, value) {
-  if (range.getFormula()) return;
-  range.setValue(value);
-}
-
 /* ============================ helper ============================ */
 
 /** Run once from the editor to confirm the script can see your table. */
 function testConnection() {
-  var d = readAll();
-  Logger.log('Sheet: %s · %s items · closing %s', d.sheetName, d.items.length, d.closingDate);
-  Logger.log(JSON.stringify(d.items[0], null, 2));
+  var t = new Date();
+  var d = readAll(layout_());
+  Logger.log('%s · %s items · closing %s · read in %sms',
+    d.sheetName, d.items.length, d.closingDate, new Date() - t);
 }

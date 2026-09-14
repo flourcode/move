@@ -42,8 +42,8 @@ spreadsheet. About ten minutes, once.
 ## 4. Paste your URL into the app
 
 1. In the repo, click `index.html`, then the **pencil** icon to edit.
-2. Find **line 384**: `const SCRIPT_URL = '';`
-   (Cmd+F / Ctrl+F works in the editor — search for `SCRIPT_URL`.)
+2. Press **Cmd+F / Ctrl+F** and search for `SCRIPT_URL`. It's near the top of
+   the script section, around **line 354**, and reads `const SCRIPT_URL = '';`
 3. Paste your URL between the quotes:
    `const SCRIPT_URL = 'https://script.google.com/macros/s/AKfyc.../exec';`
 4. **Commit changes**.
@@ -67,18 +67,12 @@ like a real app. Android: Chrome menu ▸ **Add to Home screen**.
 
 ---
 
-## What "no passcode" actually means
+## Who can see it
 
 The page is public, so anyone who stumbles across the URL can add, edit and
 delete rows. They can't open your actual spreadsheet — the script runs as you,
 so the sheet itself stays private, and the app only exposes the ten columns in
-that one tab.
-
-Realistically nobody will find a random `github.io` URL. But if it ever becomes
-a nuisance, the lock is already built in: put any word on **line 19** of
-`Code.gs`, then **Deploy ▸ Manage deployments ▸ pencil ▸ Version: New version ▸
-Deploy**. The app starts asking for it on its own. Nothing to change in the
-HTML.
+that one tab. Realistically nobody finds a random `github.io` URL.
 
 ## When something doesn't work
 
@@ -95,9 +89,15 @@ Version: New version ▸ Deploy**. This catches everyone at least once.
 **You changed `index.html` but the site looks the same.** GitHub caches for a
 few minutes. Hard refresh: Cmd+Shift+R (Mac) or Ctrl+F5 (Windows).
 
+**Saves feel slow.** The app shows your change immediately and syncs in the
+background — the dot next to the title pulses amber while it's writing. If a
+write fails, the change rolls back and you get a message. A save normally lands
+in about a second; the very first one after a few idle minutes takes longer
+because Google has to wake the script up.
+
 **It loads but edits don't stick.** Check the tab is still named
 `Move-In Purchases` and row 7 still says `Room / Space`. The script finds your
 table by that header.
 
-**You renamed a column.** Update the matching line in the `H` block near the
-top of the script section in `index.html` (around line 390).
+**You renamed a column.** Update the matching line in the `H` block just below
+`const SCRIPT_URL` in `index.html`.
