@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Move In">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>OLEA Move In</title>
+<style>
+/* ─────────────────────────  tokens  ───────────────────────── */
+:root{
+  --bg:#f2f2f5;
+  --panel:#ffffff;
+  --panel-2:#fbfbfd;
+  --ink:#1d1d1f;
+  --ink-2:#6e6e73;
+  --ink-3:#a5a5aa;
+  --sep:rgba(0,0,0,.085);
+  --sep-strong:rgba(0,0,0,.16);
+  --tint:#0071e3;
+  --green:#249c3f;
+  --amber:#c37100;
+  --violet:#6a4fd8;
+  --grey:#8a8a8f;
+  --red:#c8392e;
+  --shadow:0 1px 2px rgba(0,0,0,.05), 0 8px 28px rgba(0,0,0,.06);
+  --r-lg:20px; --r-md:14px; --r-sm:10px;
+  --ease:cubic-bezier(.32,.72,0,1);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#000; --panel:#1c1c1e; --panel-2:#242427;
+    --ink:#f5f5f7; --ink-2:#9b9ba1; --ink-3:#6a6a70;
+    --sep:rgba(255,255,255,.1); --sep-strong:rgba(255,255,255,.22);
+    --tint:#3b9bff; --green:#3ddc6a; --amber:#ffa62b; --violet:#a58bff; --grey:#8a8a8f; --red:#ff6a5c;
+    --shadow:0 1px 2px rgba(0,0,0,.6), 0 12px 40px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;
+  font-size:15px; line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;
+  padding-bottom:calc(96px + env(safe-area-inset-bottom));
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;padding:0}
+:focus-visible{outline:2.5px solid var(--tint);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.wrap{max-width:860px;margin:0 auto;padding:0 20px}
+
+/* ─────────────────────────  top bar  ───────────────────────── */
+.bar{
+  position:sticky;top:0;z-index:40;
+  background:color-mix(in srgb,var(--bg) 78%,transparent);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid transparent;transition:border-color .2s;
+}
+.bar.stuck{border-bottom-color:var(--sep)}
+.bar-in{display:flex;align-items:center;gap:12px;height:52px}
+.brand{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-right:auto;display:flex;align-items:center;gap:8px}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+.dot-live.off{background:var(--ink-3)}
+.icon-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--sep);color:var(--ink)}
+.icon-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.spin{animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ─────────────────────────  hero  ───────────────────────── */
+.hero{padding:34px 0 6px}
+.hero-top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.count{display:flex;align-items:baseline;gap:14px}
+.count b{
+  font-size:clamp(76px,17vw,132px);font-weight:600;letter-spacing:-.055em;line-height:.84;
+  font-family:-apple-system,"SF Pro Display",system-ui,sans-serif;
+}
+.count span{font-size:19px;color:var(--ink-2);letter-spacing:-.01em;max-width:9ch;line-height:1.2}
+.keydate{text-align:right}
+.keydate .k{font-size:13px;color:var(--ink-2)}
+.keydate .v{font-size:19px;font-weight:600;letter-spacing:-.015em;margin-top:2px}
+
+/* runway */
+.runway{margin-top:34px;padding:46px 4px 8px;position:relative}
+.rail{position:relative;height:3px;background:var(--sep);border-radius:3px}
+.rail-fill{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:3px;opacity:.85}
+.tick{position:absolute;top:14px;transform:translateX(-50%);font-size:11px;color:var(--ink-3);white-space:nowrap}
+.tick i{position:absolute;left:50%;top:-14px;width:1px;height:8px;background:var(--sep-strong);display:block}
+.drop{
+  position:absolute;top:50%;transform:translate(-50%,-50%);
+  border-radius:50%;border:2.5px solid var(--bg);cursor:pointer;
+  transition:transform .18s var(--ease);
+}
+.drop:hover,.drop.on{transform:translate(-50%,-50%) scale(1.35)}
+.drop b{
+  position:absolute;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);font-size:11.5px;font-weight:500;padding:5px 9px;border-radius:7px;
+  white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;letter-spacing:-.01em;
+}
+.drop:hover b,.drop.on b{opacity:1}
+.keymark{position:absolute;bottom:100%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+.keymark b{background:var(--ink);color:var(--bg);font-size:11px;font-weight:500;letter-spacing:-.005em;
+  padding:3.5px 9px;border-radius:7px;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.keymark i{width:1.5px;height:11px;background:var(--ink);opacity:.45}
+.keymark svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.keyline{position:absolute;top:-4px;height:11px;width:1.5px;background:var(--ink);opacity:.45;transform:translateX(-50%)}
+.runway-note{margin-top:26px;font-size:13px;color:var(--ink-2)}
+#app.boot .count b,#app.boot .keydate .v,#app.boot .money-row .big{color:var(--sep-strong);opacity:.45}
+#app.boot #counts,#app.boot .stack,#app.boot .legend{visibility:hidden}
+
+/* ─────────────────────────  spend bar  ───────────────────────── */
+.money{margin:26px 0 8px}
+.money-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:12px}
+.money-row .big{font-size:30px;font-weight:600;letter-spacing:-.03em}
+.money-row .sub{font-size:13.5px;color:var(--ink-2)}
+.stack{display:flex;gap:3px;height:10px}
+.stack i{display:block;border-radius:3px;min-width:3px;transition:flex-grow .4s var(--ease)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:12.5px;color:var(--ink-2)}
+.legend b{font-weight:500;color:var(--ink)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend em{width:8px;height:8px;border-radius:2.5px;font-style:normal}
+
+/* ─────────────────────────  controls  ───────────────────────── */
+.controls{position:sticky;top:52px;z-index:30;padding:12px 0 10px;
+  background:color-mix(in srgb,var(--bg) 78%,transparent);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px)}
+.search{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:11px;padding:0 12px;height:38px;box-shadow:0 0 0 1px var(--sep) inset}
+.search svg{width:16px;height:16px;stroke:var(--ink-3);fill:none;stroke-width:2;flex:none}
+.search input{flex:1;border:0;background:none;outline:none;font-size:15px;min-width:0}
+.search input::placeholder{color:var(--ink-3)}
+.chips{display:flex;gap:7px;margin-top:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:6px 13px;border-radius:999px;font-size:13.5px;color:var(--ink-2);
+  background:var(--panel);box-shadow:0 0 0 1px var(--sep) inset;transition:.15s}
+.chip.on{background:var(--ink);color:var(--bg);box-shadow:none}
+.chip u{text-decoration:none;opacity:.55;margin-left:5px;font-size:12px}
+
+/* ─────────────────────────  list  ───────────────────────── */
+.group{margin-top:26px}
+.group-head{display:flex;align-items:baseline;gap:10px;padding:0 4px 8px}
+.group-head h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-.02em}
+.group-head em{font-style:normal;font-size:13px;color:var(--ink-3);margin-left:auto}
+.card{background:var(--panel);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+.row{display:flex;align-items:center;gap:14px;padding:13px 16px;width:100%;text-align:left;position:relative;transition:background .12s}
+.row+.row::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--sep)}
+.row:hover{background:var(--panel-2)}
+.row:active{background:var(--sep)}
+.mark{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;background:var(--panel-2);box-shadow:0 0 0 1px var(--sep) inset}
+.mark svg{width:19px;height:19px;stroke:var(--ink-2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.row-main{flex:1;min-width:0}
+.row-main h3{margin:0;font-size:15px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-main p{margin:2px 0 0;font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-end{text-align:right;flex:none;display:flex;align-items:center;gap:12px}
+.price{font-size:15px;font-weight:500;letter-spacing:-.015em}
+.eta{font-size:12px;color:var(--ink-3);margin-top:2px}
+.pill{font-size:12px;font-weight:500;padding:4px 9px;border-radius:7px;white-space:nowrap;transition:transform .12s}
+.pill:active{transform:scale(.94)}
+.chev{width:16px;height:16px;stroke:var(--ink-3);fill:none;stroke-width:2;flex:none}
+.row-main .compact{display:none}
+@media (max-width:620px){
+  .row-end .price-wrap{display:none}
+  .row-main .compact{display:inline}
+  .row{padding:12px 14px;gap:11px}
+  .money-row{flex-direction:column;align-items:flex-start;gap:3px}
+  .keydate{text-align:left}
+  .count b{line-height:.9}
+}
+
+/* empty */
+.empty{text-align:center;padding:56px 24px;color:var(--ink-2)}
+.empty h3{margin:0 0 6px;font-size:17px;font-weight:600;color:var(--ink);letter-spacing:-.015em}
+.empty p{margin:0;font-size:14px}
+
+/* ─────────────────────────  add button  ───────────────────────── */
+.fab{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(22px + env(safe-area-inset-bottom));z-index:35;
+  display:flex;align-items:center;gap:8px;height:48px;padding:0 22px 0 18px;border-radius:999px;
+  background:var(--ink);color:var(--bg);font-size:15px;font-weight:500;letter-spacing:-.01em;
+  box-shadow:0 6px 24px rgba(0,0,0,.22);transition:transform .18s var(--ease)
+}
+.fab:active{transform:translateX(-50%) scale(.96)}
+.fab svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+
+/* ─────────────────────────  sheet  ───────────────────────── */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.open{opacity:1;pointer-events:auto}
+@media (prefers-color-scheme:dark){.scrim{background:rgba(0,0,0,.6)}}
+.sheet{
+  position:fixed;z-index:51;left:50%;bottom:0;width:min(560px,100%);visibility:hidden;
+  transform:translate(-50%,102%);transition:transform .42s var(--ease),visibility 0s .42s;
+  background:var(--bg);border-radius:22px 22px 0 0;max-height:92vh;display:flex;flex-direction:column;
+  box-shadow:0 -10px 60px rgba(0,0,0,.25)
+}
+.sheet.open{transform:translate(-50%,0);visibility:visible;transition:transform .42s var(--ease),visibility 0s}
+@media (min-width:640px){
+  .sheet{bottom:auto;top:50%;border-radius:20px;transform:translate(-50%,-44%) scale(.96);opacity:0;max-height:86vh}
+  .sheet.open{transform:translate(-50%,-50%) scale(1);opacity:1}
+}
+.sheet-bar{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--sep);flex:none}
+.sheet-bar h2{flex:1;text-align:center;margin:0;font-size:16px;font-weight:600;letter-spacing:-.015em}
+.sheet-bar button{font-size:15px;color:var(--tint);min-width:62px}
+.sheet-bar button.strong{font-weight:600;text-align:right}
+.sheet-bar button[disabled]{color:var(--ink-3);cursor:default}
+.sheet-body{overflow-y:auto;padding:18px 18px 28px;-webkit-overflow-scrolling:touch}
+.fieldset{background:var(--panel);border-radius:var(--r-md);overflow:hidden;margin-bottom:18px}
+.field{display:flex;align-items:center;gap:12px;padding:0 14px;min-height:46px;position:relative}
+.field+.field::before{content:"";position:absolute;left:14px;right:0;top:0;height:1px;background:var(--sep)}
+.field label{width:112px;flex:none;font-size:14px;color:var(--ink-2)}
+.field input,.field select{flex:1;border:0;background:none;outline:none;font-size:15px;min-width:0;padding:11px 0;text-align:right;appearance:none}
+.field select{cursor:pointer;direction:rtl}
+.field input::placeholder{color:var(--ink-3)}
+.hint{font-size:12.5px;color:var(--ink-2);padding:0 4px 16px;margin-top:-8px}
+.danger{width:100%;background:var(--panel);border-radius:var(--r-md);padding:13px;text-align:center;color:var(--red);font-size:15px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;flex:1;justify-content:flex-end;padding:9px 0}
+.field.f-money input{flex:0 1 auto;width:130px}
+.field .cur{margin-left:auto;color:var(--ink-3)}
+@media (max-width:540px){
+  .field.f-stack{flex-direction:column;align-items:stretch;gap:0}
+  .field.f-stack label{width:auto;padding-top:12px}
+  .field.f-stack .seg{justify-content:flex-start;flex:none;padding:8px 0 12px}
+}
+.seg button{padding:6px 11px;border-radius:8px;font-size:13.5px;color:var(--ink-2);box-shadow:0 0 0 1px var(--sep) inset}
+.seg button.on{color:var(--bg);font-weight:500;box-shadow:none}
+
+/* ─────────────────────────  connect  ───────────────────────── */
+.connect{position:fixed;inset:0;z-index:60;background:var(--bg);overflow-y:auto;display:none}
+.connect.show{display:block}
+.connect .wrap{max-width:560px;padding-top:9vh;padding-bottom:60px}
+.connect h1{font-size:34px;font-weight:600;letter-spacing:-.03em;margin:0 0 10px}
+.connect .lede{font-size:16px;color:var(--ink-2);margin:0 0 30px;max-width:46ch}
+.steps{counter-reset:s;list-style:none;margin:0 0 26px;padding:0}
+.steps li{counter-increment:s;position:relative;padding:0 0 16px 34px;font-size:14.5px;color:var(--ink-2)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:21px;height:21px;border-radius:50%;
+  background:var(--ink);color:var(--bg);font-size:12px;font-weight:600;display:grid;place-items:center}
+.steps li b{color:var(--ink);font-weight:500}
+.steps code{background:var(--panel);padding:2px 6px;border-radius:5px;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.connect .btn{display:block;width:100%;height:48px;border-radius:12px;background:var(--tint);color:#fff;font-size:16px;font-weight:500;margin-top:6px}
+.connect .btn.ghost{background:none;color:var(--tint);height:42px;font-size:15px;margin-top:2px}
+.connect .btn.quiet{background:none;color:var(--ink-2);height:42px;font-size:14px;margin-top:2px}
+.pane{display:none}
+.pane.on{display:block}
+.field .val{margin-left:auto;font-size:15px;color:var(--ink-2)}
+.err{background:color-mix(in srgb,var(--red) 12%,var(--panel));color:var(--red);border-radius:11px;padding:11px 14px;font-size:13.5px;margin-bottom:14px}
+
+/* ─────────────────────────  toast  ───────────────────────── */
+.toast{
+  position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,16px);
+  z-index:70;background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:.28s var(--ease);max-width:calc(100% - 40px);text-align:center
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--red);color:#fff}
+
+.banner{background:var(--panel);border-radius:12px;padding:11px 14px;font-size:13px;color:var(--ink-2);
+  display:flex;align-items:center;gap:10px;margin-top:16px;box-shadow:0 0 0 1px var(--sep) inset}
+.banner button{color:var(--tint);font-size:13px;margin-left:auto;flex:none}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ connect ══════════════════ -->
+<div class="connect" id="connect">
+  <div class="wrap">
+
+    <div class="pane" id="paneLock">
+      <h1>OLEA Move In</h1>
+      <p class="lede">Enter the passcode to open the move-in plan. You only have to do this once on this device.</p>
+      <div id="lockErr"></div>
+      <div class="fieldset">
+        <div class="field"><label for="lockIn">Passcode</label><input id="lockIn" type="password" placeholder="Required" autocomplete="current-password" spellcheck="false"></div>
+      </div>
+      <button class="btn" id="lockGo">Unlock</button>
+      <button class="btn quiet" id="lockDemo">Look around with sample data</button>
+    </div>
+
+    <div class="pane" id="paneAccount">
+      <h1>Connection</h1>
+      <p class="lede">Linked to your Google Sheet. Every change you make here saves straight into it.</p>
+      <div class="fieldset">
+        <div class="field"><label>Tab</label><span class="val" id="acctSheet">—</span></div>
+        <div class="field"><label>Items</label><span class="val" id="acctCount">—</span></div>
+        <div class="field"><label>Loaded</label><span class="val" id="acctTime">—</span></div>
+      </div>
+      <button class="btn" id="acctDone">Done</button>
+      <button class="btn quiet" id="acctForget">Forget passcode on this device</button>
+    </div>
+
+    <div class="pane" id="paneSetup">
+      <h1>Connect your sheet</h1>
+      <p class="lede">This app reads and writes the “Move-In Purchases” tab directly. Deploy the included script once, then paste its address below.</p>
+      <div id="connectErr"></div>
+      <ol class="steps">
+        <li>In your spreadsheet, open <b>Extensions ▸ Apps Script</b> and paste in <code>Code.gs</code>.</li>
+        <li>Click <b>Deploy ▸ New deployment ▸ Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>.</li>
+        <li>Authorise it, then copy the web app URL — it ends in <code>/exec</code>.</li>
+      </ol>
+      <div class="fieldset">
+        <div class="field"><label for="urlIn">Web app URL</label><input id="urlIn" type="url" placeholder="https://script.google.com/…/exec" spellcheck="false"></div>
+        <div class="field"><label for="tokIn">Passcode</label><input id="tokIn" type="text" placeholder="Optional" spellcheck="false"></div>
+      </div>
+      <button class="btn" id="connectGo">Connect</button>
+      <button class="btn ghost" id="connectDemo">Browse the sample data instead</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════ app ══════════════════ -->
+<header class="bar" id="bar">
+  <div class="wrap bar-in">
+    <div class="brand"><span class="dot-live off" id="live"></span><span>OLEA Move In</span></div>
+    <button class="icon-btn" id="refresh" title="Refresh from sheet" aria-label="Refresh from sheet">
+      <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+    </button>
+    <button class="icon-btn" id="settings" title="Connection" aria-label="Connection settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.6a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.56-1.13 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.03Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap" id="app" hidden>
+  <section class="hero">
+    <div class="hero-top">
+      <div class="count"><b id="days">—</b><span id="daysLabel">days until the keys</span></div>
+      <div class="keydate"><div class="k">Closing</div><div class="v" id="closing">—</div></div>
+    </div>
+
+    <div class="runway" id="runway"></div>
+    <p class="runway-note" id="runwayNote"></p>
+
+    <div class="money">
+      <div class="money-row">
+        <div class="big" id="total">—</div>
+        <div class="sub" id="counts"></div>
+      </div>
+      <div class="stack" id="stack"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div id="banner"></div>
+  </section>
+
+  <section class="controls">
+    <div class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input id="q" type="search" placeholder="Search items, rooms, brands" autocomplete="off">
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <div id="list"></div>
+</main>
+
+<button class="fab" id="add" hidden><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add item</button>
+
+<!-- ══════════════════ editor ══════════════════ -->
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-bar">
+    <button id="cancel">Cancel</button>
+    <h2 id="sheetTitle">Edit item</h2>
+    <button class="strong" id="save">Save</button>
+  </div>
+  <div class="sheet-body" id="form"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   ▼▼▼  THE ONLY LINE YOU NEED TO EDIT  ▼▼▼
+   Paste the web app URL you got from Apps Script between the quotes.
+   It looks like: https://script.google.com/macros/s/AKfycb.../exec
+   ════════════════════════════════════════════════════════════════ */
+const SCRIPT_URL = '';
+
+/*  Leave this empty. The passcode is typed in by each person once and
+    kept on their own device — putting it here would publish it.       */
+const ACCESS_CODE = 'https://script.google.com/macros/s/AKfycbyK_lAPst3z1zkvN81XDns2WWGnsEZFuxNYqjBT-jL6INezn7Y9KSkxQIBjT-ul1Cbnww/exec';
+
+/* ─────────────────────────  config  ───────────────────────── */
+const H = {
+  room:'Room / Space', item:'Item Description', category:'Category', brand:'Brand Name',
+  retailer:'Retailer / Website', priority:'Priority', price:'Estimated Price',
+  order:'Target Order Date', delivery:'Scheduled Delivery Date', status:'Order Status'
+};
+const STATUSES = ['Not Ordered','Ordered','In Transit','Delivered'];
+const PRIORITIES = ['High - Essential','Medium','Low'];
+const STATUS_COLOR = {'not ordered':'--grey','ordered':'--amber','in transit':'--violet','delivered':'--green'};
+const ROOM_ICON = [
+  [/kitchen|pantry/i,'fridge'], [/laundry|utility|mud/i,'washer'], [/bed|primary|guest|nursery/i,'bed'],
+  [/living|family|lounge|den/i,'sofa'], [/bath|powder|shower/i,'bath'],
+  [/patio|pool|outdoor|yard|garden|deck|lawn/i,'leaf'], [/office|study|desk/i,'lamp'],
+  [/garage|driveway/i,'car'], [/din|breakfast|nook/i,'plate'], [/fan|ceiling|celling|hall|entry|foyer|stair/i,'fan']
+];
+const GLYPH = {
+  fridge:'<rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M6 10h12M9.5 6.3v2M9.5 12.8v2.4"/>',
+  washer:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.8"/><path d="M8 6.4h.01M11 6.4h.01"/>',
+  bed:'<path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 14h18M3 18v2M21 18v2M7.5 9V6.6h4V9"/>',
+  sofa:'<path d="M4.5 11.5V8.5A2.5 2.5 0 0 1 7 6h10a2.5 2.5 0 0 1 2.5 2.5v3M3 13a1.5 1.5 0 0 1 1.5-1.5h15A1.5 1.5 0 0 1 21 13v4H3zM6 17v2M18 17v2"/>',
+  bath:'<path d="M4 11h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM6.5 11V6.2a1.8 1.8 0 0 1 3.6 0M6.5 18l-1.2 2M17.5 18l1.2 2"/>',
+  leaf:'<path d="M20 4c0 8-5 13-12 13H5c0-8 5-13 12-13zM5 20c1.6-4.2 4.2-7.2 8.2-9.2"/>',
+  lamp:'<path d="M9 4h6l3.2 7H5.8zM12 11v7.5M8.8 20.5h6.4"/>',
+  car:'<path d="M6.4 14.6 7.7 10a2 2 0 0 1 1.9-1.4h4.8a2 2 0 0 1 1.9 1.4l1.3 4.6M4 14.6h16V18H4zM7 18v1.6M17 18v1.6"/>',
+  plate:'<circle cx="12" cy="12" r="7.6"/><circle cx="12" cy="12" r="3.4"/>',
+  fan:'<circle cx="12" cy="12" r="1.9"/><path d="M12 10.1c0-2.9 1-5.8 3.9-5.8s2.9 3.9 0 4.9M13.9 12c2.9 0 5.8 1 5.8 3.9s-3.9 2.9-4.9 0M10.1 12c-2.9 0-5.8-1-5.8-3.9s3.9-2.9 4.9 0M12 13.9c0 2.9-1 5.8-3.9 5.8s-2.9-3.9 0-4.9"/>',
+  box:'<path d="M12 3.2 20 7v10l-8 3.8L4 17V7zM4.2 7 12 10.8 19.8 7M12 10.8v10"/>'
+};
+
+/* ─────────────────────────  state  ───────────────────────── */
+let state = {
+  url:'', token:'', demo:false, loading:false, locked:true, loadedAt:null, sheetName:'',
+  headers:[], items:[], closing:'',
+  filter:'all', query:'', dateFilter:'', editing:null
+};
+
+const $ = s => document.querySelector(s);
+const store = {
+  get(k){ try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+
+/* ─────────────────────────  helpers  ───────────────────────── */
+const money = n => '$' + Math.round(Number(n)||0).toLocaleString('en-US');
+const num = v => { const n = Number(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
+function parseDate(s){
+  if(!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s); return isNaN(d) ? null : new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const dayDiff = (a,b) => Math.round((a-b)/86400000);
+const fmtDay = d => d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+const fmtFull = d => d ? d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '';
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s??'').replace(/\s+/g,' ').trim().toLowerCase();
+const statusVar = s => STATUS_COLOR[norm(s)] || '--grey';
+const roomIcon = r => {
+  const hit = ROOM_ICON.find(([re])=>re.test(r||''));
+  return `<svg viewBox="0 0 24 24">${GLYPH[hit?hit[1]:'box']}</svg>`;
+};
+
+function get(it,key){
+  const want = norm(H[key]);
+  for(const k in it.cells){ if(norm(k)===want) return it.cells[k]; }
+  return '';
+}
+function toast(msg,bad){
+  const t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' bad':'');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='toast',bad?4200:2200);
+}
+
+/* ─────────────────────────  api  ───────────────────────── */
+async function api(action, payload){
+  if(state.demo) return demoApi(action,payload);
+  const body = Object.assign({action, token:state.token}, payload||{});
+  const res = await fetch(state.url, {
+    method:'POST', redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error('The sheet returned '+res.status+'. Check the deployment is set to “Anyone”.');
+  let json;
+  try{ json = JSON.parse(await res.text()); }
+  catch(e){ throw new Error('That URL didn’t return sheet data. Make sure it ends in /exec.'); }
+  if(!json.ok){
+    const e = new Error(json.error||'The sheet rejected that change.');
+    e.needAuth = !!json.needAuth;
+    throw e;
+  }
+  return json.data;
+}
+
+function absorb(data){
+  state.headers = data.headers || state.headers;
+  state.items = data.items || [];
+  state.closing = data.closingDate || state.closing;
+  state.sheetName = data.sheetName || state.sheetName;
+  render();
+}
+
+async function load(silent){
+  if(state.loading) return;
+  state.loading = true;
+  $('#refresh').firstElementChild.classList.add('spin');
+  try{
+    absorb(await api('list'));
+    state.locked = false; state.loadedAt = new Date();
+    showApp(); closeConnect();
+    $('#live').classList.toggle('off', state.demo);
+    if(!silent) toast(state.demo ? 'Showing sample data' : 'Up to date with the sheet');
+  }catch(err){
+    if(state.items.length) toast(err.message, true);
+    else if(err.needAuth) openConnect('lock', state.token ? err.message : '');
+    else openConnect('setup', err.message);
+  }finally{
+    state.loading=false;
+    $('#refresh').firstElementChild.classList.remove('spin');
+  }
+}
+
+/* ─────────────────────────  demo  ───────────────────────── */
+const DEMO_ROWS = [
+  ['Kitchen','French Door Smart Refrigerator (Counter-Depth)','Major Appliance','LG Electronics','BestBuy.com','High - Essential',4499,'2026-09-01','2026-10-06','Ordered'],
+  ['Laundry','Front Load Washer & Electric Dryer Set','Major Appliance','Electrolux','HomeDepot.com','High - Essential',1898,'2026-09-05','2026-10-07','Ordered'],
+  ['Primary Bedroom','Solid Wood Upholstered King Bed Frame','Furniture','Article','Article.com','High - Essential',2299,'2026-09-02','2026-10-06','In Transit'],
+  ['Primary Bedroom','Matching 2-Drawer Nightstands (Set of 2)','Furniture','West Elm','WestElm.com','Medium',798,'2026-09-15','2026-10-09','Ordered'],
+  ['Living Room','4-Piece Performance Fabric Sectional Sofa','Furniture','Pottery Barn','PotteryBarn.com','High - Essential',3499,'2026-08-20','2026-10-07','Ordered'],
+  ['Living Room','65-Inch 4K OLED Smart TV','Electronics','Sony','BestBuy.com','Medium',1699,'2026-09-18','2026-10-08','Not Ordered'],
+  ['Living Room','Round Travertine Coffee Table','Furniture','CB2','CB2.com','Low',649,'2026-09-22','2026-10-12','Not Ordered'],
+  ['Kitchen','Leather Counter Height Stools (Set of 3)','Furniture','Target Project 62','Target.com','Low',1490,'2026-09-25','2026-10-11','Not Ordered'],
+  ['Ceiling Fans','Fans','Smart Home','Unknown','Amazon.com','High - Essential',1299,'2026-09-12','2026-10-05','Delivered'],
+  ['Patio','Pool Furniture','Furniture','Unknown','Costco','High - Essential',3449,'2026-09-12','2026-10-05','Delivered']
+];
+let demoStore = null;
+function demoApi(action,p){
+  const heads = Object.values(H);
+  if(!demoStore){
+    demoStore = DEMO_ROWS.map((r,i)=>{
+      const cells={}; heads.forEach((h,j)=>cells[h]=r[j]); return {row:8+i, cells};
+    });
+  }
+  if(action==='create'){ demoStore.push({row: Date.now(), cells: p.item.cells}); }
+  if(action==='update'){ const t=demoStore.find(x=>x.row===p.item.row); if(t) t.cells=p.item.cells; }
+  if(action==='delete'){ demoStore = demoStore.filter(x=>x.row!==p.item.row); }
+  return Promise.resolve({headers:heads, items:JSON.parse(JSON.stringify(demoStore)), closingDate:'2026-10-06'});
+}
+
+/* ─────────────────────────  render  ───────────────────────── */
+function render(){ $('#app').classList.remove('boot'); renderHero(); renderChips(); renderList(); }
+
+function renderHero(){
+  const close = parseDate(state.closing);
+  const d = close ? dayDiff(close, today()) : null;
+  $('#days').textContent = d===null ? '—' : Math.abs(d);
+  $('#daysLabel').textContent = d===null ? 'no closing date set'
+    : d>1 ? 'days until the keys' : d===1 ? 'day until the keys' : d===0 ? 'moving day' : 'days since closing';
+  $('#closing').textContent = close ? fmtFull(close) : 'Not set';
+
+  const items = state.items;
+  const total = items.reduce((s,i)=>s+num(get(i,'price')),0);
+  const delivered = items.filter(i=>norm(get(i,'status'))==='delivered').length;
+  const pending = items.filter(i=>['ordered','in transit'].includes(norm(get(i,'status')))).length;
+  $('#total').textContent = money(total);
+  $('#counts').textContent = items.length
+    ? `${delivered} of ${items.length} delivered · ${pending} on the way`
+    : 'Nothing tracked yet';
+
+  const groups = STATUSES.map(s=>({
+    s, sum: items.filter(i=>norm(get(i,'status'))===norm(s)).reduce((a,i)=>a+num(get(i,'price')),0),
+    n: items.filter(i=>norm(get(i,'status'))===norm(s)).length
+  })).filter(g=>g.sum>0||g.n>0);
+
+  $('#stack').innerHTML = groups.map(g=>
+    `<i style="flex:${Math.max(g.sum,total*0.015)||1};background:var(${statusVar(g.s)})"></i>`).join('');
+  $('#legend').innerHTML = groups.map(g=>
+    `<span><em style="background:var(${statusVar(g.s)})"></em>${esc(g.s)} <b>${money(g.sum)}</b></span>`).join('');
+
+  renderRunway(close);
+  renderBanner();
+}
+
+function renderRunway(close){
+  const el = $('#runway'), note = $('#runwayNote');
+  const dated = state.items.map(i=>({i, d:parseDate(get(i,'delivery'))})).filter(x=>x.d);
+  if(!dated.length && !close){ el.innerHTML=''; note.textContent=''; return; }
+
+  const t = today();
+  const all = dated.map(x=>x.d).concat(close?[close]:[]);
+  let min = new Date(Math.min(t, ...all)), max = new Date(Math.max(...all, t));
+  if(dayDiff(max,min) < 14) max = new Date(min.getTime()+14*86400000);
+  const pad = Math.ceil(dayDiff(max,min)*0.06);
+  min = new Date(min.getTime()-pad*86400000); max = new Date(max.getTime()+pad*86400000);
+  const span = dayDiff(max,min) || 1;
+  const pct = d => Math.max(0,Math.min(100, dayDiff(d,min)/span*100));
+
+  const byDate = {};
+  dated.forEach(x=>{ const k=iso(x.d); (byDate[k]=byDate[k]||[]).push(x.i); });
+
+  const ticks = [];
+  if(span <= 60){
+    let cur = new Date(t);
+    while(cur <= max){
+      ticks.push({d:new Date(cur), t: dayDiff(cur,t)===0 ? 'Today' : fmtDay(cur)});
+      cur = new Date(cur.getTime() + Math.max(7, Math.round(span/6))*86400000);
+    }
+  } else {
+    let cur = new Date(min.getFullYear(), min.getMonth()+1, 1);
+    while(cur <= max){
+      ticks.push({d:new Date(cur), t:cur.toLocaleDateString('en-US',{month:'short'})});
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+  }
+
+  el.innerHTML = `
+    <div class="rail">
+      <div class="rail-fill" style="width:${pct(t)}%"></div>
+      ${ticks.map(k=>`<span class="tick" style="left:${pct(k.d)}%"><i></i>${k.t}</span>`).join('')}
+      ${Object.entries(byDate).map(([k,list])=>{
+        const d=parseDate(k), s=12+Math.min(list.length-1,3)*4;
+        const dom = list.slice().sort((a,b)=>num(get(b,'price'))-num(get(a,'price')))[0];
+        const label = list.length>1 ? `${list.length} deliveries · ${fmtDay(d)}` : `${get(dom,'item')} · ${fmtDay(d)}`;
+        return `<button class="drop${state.dateFilter===k?' on':''}" data-date="${k}" style="left:${pct(d)}%;width:${s}px;height:${s}px;background:var(${statusVar(get(dom,'status'))})" aria-label="${esc(label)}"><b>${esc(label)}</b></button>`;
+      }).join('')}
+      ${close?`<span class="keyline" style="left:${pct(close)}%"></span>
+      <span class="keymark" style="left:${pct(close)}%">
+        <b><svg viewBox="0 0 24 24"><circle cx="8.5" cy="12" r="3.6"/><path d="M12.1 12H20M17.4 12v3.2M14.8 12v2.4"/></svg>Closing</b><i></i></span>`:''}
+    </div>`;
+
+  el.querySelectorAll('.drop').forEach(b=>b.addEventListener('click',()=>{
+    state.dateFilter = state.dateFilter===b.dataset.date ? '' : b.dataset.date;
+    state.filter='all'; render();
+    if(state.dateFilter) $('#list').scrollIntoView({behavior:'smooth',block:'start'});
+  }));
+
+  const soon = dated.filter(x=>dayDiff(x.d,t)>=0).sort((a,b)=>a.d-b.d)[0];
+  const late = close ? dated.filter(x=>dayDiff(x.d,close)>0) : [];
+  note.textContent = soon
+    ? `Next delivery ${fmtDay(soon.d)} — ${get(soon.i,'item')}.` + (late.length?` ${late.length} ${late.length===1?'item lands':'items land'} after closing.`:'')
+    : 'No upcoming deliveries scheduled.';
+}
+
+function renderBanner(){
+  const b=$('#banner');
+  if(state.demo){
+    b.innerHTML = `<div class="banner">Sample data — edits stay in this browser.<button id="bconnect">Connect sheet</button></div>`;
+    $('#bconnect').onclick = ()=>openConnect();
+  } else b.innerHTML='';
+}
+
+function renderChips(){
+  const counts = {};
+  STATUSES.forEach(s=>counts[s]=state.items.filter(i=>norm(get(i,'status'))===norm(s)).length);
+  const opts = [['all','Everything',state.items.length]].concat(STATUSES.map(s=>[s,s,counts[s]]));
+  $('#chips').innerHTML = opts.map(([k,l,n])=>
+    `<button class="chip${state.filter===k?' on':''}" data-f="${esc(k)}">${esc(l)}<u>${n}</u></button>`).join('');
+  $('#chips').querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+    state.filter=c.dataset.f; state.dateFilter=''; render();
+  }));
+}
+
+function visible(){
+  const q = norm(state.query);
+  return state.items.filter(i=>{
+    if(state.filter!=='all' && norm(get(i,'status'))!==norm(state.filter)) return false;
+    if(state.dateFilter && get(i,'delivery')!==state.dateFilter) return false;
+    if(!q) return true;
+    return ['room','item','category','brand','retailer','status'].some(k=>norm(get(i,k)).includes(q));
+  });
+}
+
+function renderList(){
+  const items = visible();
+  const host = $('#list');
+  if(!items.length){
+    if(state.loading && !state.items.length) return;
+    host.innerHTML = `<div class="card" style="margin-top:26px"><div class="empty">
+      <h3>${state.items.length?'Nothing matches':'Your list is empty'}</h3>
+      <p>${state.items.length?'Try a different filter or search.':'Add your first purchase to start tracking it.'}</p>
+    </div></div>`;
+    return;
+  }
+
+  const order = {}; state.items.forEach((i,ix)=>order[get(i,'room')] ??= ix);
+  const rooms = [...new Set(items.map(i=>get(i,'room')||'Unassigned'))]
+    .sort((a,b)=>(order[a]??99)-(order[b]??99));
+
+  host.innerHTML = rooms.map(room=>{
+    const rows = items.filter(i=>(get(i,'room')||'Unassigned')===room);
+    const sum = rows.reduce((s,i)=>s+num(get(i,'price')),0);
+    return `<section class="group">
+      <div class="group-head"><h2>${esc(room)}</h2><em>${money(sum)}</em></div>
+      <div class="card">${rows.map(rowHtml).join('')}</div>
+    </section>`;
+  }).join('');
+
+  host.querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>openEditor(+el.dataset.open)));
+  host.querySelectorAll('[data-cycle]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation(); cycleStatus(+el.dataset.cycle);
+  }));
+}
+
+function rowHtml(i){
+  const st = get(i,'status')||'Not Ordered';
+  const dd = parseDate(get(i,'delivery'));
+  const meta = [get(i,'brand'), get(i,'retailer')].filter(Boolean).join(' · ');
+  return `<div class="row" data-open="${i.row}" role="button" tabindex="0">
+    <span class="mark">${roomIcon(get(i,'room'))}</span>
+    <div class="row-main">
+      <h3>${esc(get(i,'item')||'Untitled item')}</h3>
+      <p><span class="compact">${money(get(i,'price'))}${dd?' · '+esc(fmtDay(dd)):''} · </span>${esc(meta||get(i,'category')||'')}</p>
+    </div>
+    <div class="row-end">
+      <div class="price-wrap">
+        <div class="price">${money(get(i,'price'))}</div>
+        <div class="eta">${dd?fmtDay(dd):'No date'}</div>
+      </div>
+      <button class="pill" data-cycle="${i.row}" style="background:color-mix(in srgb,var(${statusVar(st)}) 15%,transparent);color:var(${statusVar(st)})">${esc(st)}</button>
+      <svg class="chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+    </div>
+  </div>`;
+}
+
+/* ─────────────────────────  editing  ───────────────────────── */
+const FORM = [
+  {k:'item',    t:'text',   ph:'e.g. Entry console table'},
+  {k:'room',    t:'text',   ph:'e.g. Living Room'},
+  {k:'category',t:'text',   ph:'e.g. Furniture'},
+  {k:'brand',   t:'text',   ph:'Brand'},
+  {k:'retailer',t:'text',   ph:'Where from'},
+  {k:'price',   t:'number', ph:'0'},
+  {k:'order',   t:'date'},
+  {k:'delivery',t:'date'},
+];
+const LABEL = {item:'Item',room:'Room',category:'Category',brand:'Brand',retailer:'Retailer',price:'Price',order:'Order by',delivery:'Delivery'};
+
+function openEditor(row){
+  const existing = state.items.find(i=>i.row===row) || null;
+  state.editing = existing ? JSON.parse(JSON.stringify(existing)) : {row:null, cells:{}};
+  state.editing._match = existing ? get(existing,'item') : '';
+  if(!existing){ state.editing.cells[H.status]='Not Ordered'; state.editing.cells[H.priority]='Medium'; }
+  $('#sheetTitle').textContent = existing ? 'Edit item' : 'New item';
+
+  const v = k => esc(existing ? get(existing,k) : (k==='status'?'Not Ordered':k==='priority'?'Medium':''));
+  const cur = k => state.editing.cells[H[k]] ?? '';
+
+  $('#form').innerHTML = `
+    <div class="fieldset">
+      ${FORM.map(f=>`<div class="field${f.k==='price'?' f-money':''}">
+        <label for="f_${f.k}">${LABEL[f.k]}</label>
+${f.k==='price'?'<span class="cur">$</span>':''}<input id="f_${f.k}" data-k="${f.k}" type="${f.t}" value="${f.t==='number'?num(v(f.k))||'':v(f.k)}" placeholder="${f.ph||''}" ${f.t==='number'?'inputmode="decimal" step="1"':''}>
+      </div>`).join('')}
+    </div>
+
+    <div class="fieldset">
+      <div class="field f-stack"><label>Status</label>
+        <div class="seg" id="segStatus">${STATUSES.map(s=>
+          `<button data-v="${esc(s)}" class="${norm(cur('status'))===norm(s)?'on':''}" style="${norm(cur('status'))===norm(s)?`background:var(${statusVar(s)})`:''}">${esc(s)}</button>`).join('')}</div>
+      </div>
+      <div class="field f-stack"><label>Priority</label>
+        <div class="seg" id="segPriority">${PRIORITIES.map(s=>
+          `<button data-v="${esc(s)}" class="${norm(cur('priority'))===norm(s)?'on':''}" style="${norm(cur('priority'))===norm(s)?'background:var(--ink)':''}">${esc(s.replace(' - Essential',' · Essential'))}</button>`).join('')}</div>
+      </div>
+    </div>
+
+    ${existing?`<button class="danger" id="del">Remove from sheet</button>`:''}
+  `;
+
+  $('#form').querySelectorAll('input[data-k]').forEach(inp=>{
+    inp.addEventListener('input',()=>{ state.editing.cells[H[inp.dataset.k]] = inp.value; });
+  });
+  bindSeg('#segStatus','status');
+  bindSeg('#segPriority','priority');
+  if(existing) $('#del').addEventListener('click',()=>remove(existing));
+
+  openSheet();
+  if(!existing) setTimeout(()=>$('#f_item').focus(),420);
+}
+
+function bindSeg(sel,key){
+  const host=$(sel); if(!host) return;
+  host.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    state.editing.cells[H[key]] = b.dataset.v;
+    host.querySelectorAll('button').forEach(x=>{ x.className=''; x.style.background=''; });
+    b.className='on';
+    b.style.background = key==='status' ? `var(${statusVar(b.dataset.v)})` : 'var(--ink)';
+  }));
+}
+
+function openSheet(){ $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeSheet(){ $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open'); document.body.style.overflow=''; state.editing=null; }
+
+async function save(){
+  const e = state.editing; if(!e) return;
+  const desc = String(e.cells[H.item]||'').trim();
+  if(!desc){ toast('Give the item a name first', true); $('#f_item').focus(); return; }
+  e.cells[H.price] = num(e.cells[H.price]);
+  const btn=$('#save'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const payload = {item:{row:e.row, match:e._match||desc, cells:e.cells}};
+    absorb(await api(e.row ? 'update' : 'create', payload));
+    closeSheet(); toast(e.row?'Saved to the sheet':'Added to the sheet');
+  }catch(err){ toast(err.message, true); }
+  finally{ btn.disabled=false; btn.textContent='Save'; }
+}
+
+async function remove(item){
+  if(!confirm(`Remove “${get(item,'item')}” from the sheet? This deletes the row.`)) return;
+  try{
+    absorb(await api('delete', {item:{row:item.row, match:get(item,'item')}}));
+    closeSheet(); toast('Removed from the sheet');
+  }catch(err){ toast(err.message, true); }
+}
+
+async function cycleStatus(row){
+  const item = state.items.find(i=>i.row===row); if(!item) return;
+  const next = STATUSES[(STATUSES.findIndex(s=>norm(s)===norm(get(item,'status')))+1+STATUSES.length)%STATUSES.length];
+  const cells = Object.assign({}, item.cells);
+  for(const k in cells){ if(norm(k)===norm(H.status)) cells[k]=next; }
+  if(!Object.keys(cells).some(k=>norm(k)===norm(H.status))) cells[H.status]=next;
+
+  item.cells = cells; render();                      // optimistic
+  try{
+    absorb(await api('update',{item:{row, match:get(item,'item'), cells}}));
+    toast(`Marked ${next.toLowerCase()}`);
+  }catch(err){ toast(err.message,true); load(true); }
+}
+
+/* ─────────────────────────  connect flow  ───────────────────────── */
+function openConnect(mode, msg){
+  mode = mode || (SCRIPT_URL ? (state.locked ? 'lock' : 'account') : 'setup');
+  ['Lock','Account','Setup'].forEach(n=>
+    $('#pane'+n).classList.toggle('on', n.toLowerCase()===mode));
+
+  if(mode==='lock'){
+    $('#lockErr').innerHTML = msg ? `<div class="err">${esc(msg)}</div>` : '';
+    setTimeout(()=>$('#lockIn').focus(), 120);
+  }
+  if(mode==='setup'){
+    $('#connectErr').innerHTML = msg ? `<div class="err">${esc(msg)}</div>` : '';
+    $('#urlIn').value = state.url; $('#tokIn').value = state.token;
+  }
+  if(mode==='account'){
+    $('#acctSheet').textContent = state.demo ? 'Sample data' : (state.sheetName||'Move-In Purchases');
+    $('#acctCount').textContent = state.items.length;
+    $('#acctTime').textContent = state.loadedAt
+      ? state.loadedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
+  }
+  $('#connect').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function closeConnect(){ $('#connect').classList.remove('show'); document.body.style.overflow=''; }
+
+async function unlock(){
+  const code = $('#lockIn').value.trim();
+  if(!code){ $('#lockIn').focus(); return; }
+  const btn=$('#lockGo'); btn.disabled=true; btn.textContent='Checking…';
+  state.token = code; state.demo = false;
+  try{
+    absorb(await api('list'));
+    store.set('olea_token', code);
+    state.locked=false; state.loadedAt=new Date();
+    closeConnect(); showApp(); $('#live').classList.remove('off');
+    toast('Welcome back');
+  }catch(err){
+    state.token='';
+    $('#lockErr').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+    $('#lockIn').select();
+  }finally{ btn.disabled=false; btn.textContent='Unlock'; }
+}
+
+function forget(){
+  store.set('olea_token',''); store.set('olea_url','');
+  location.reload();
+}
+
+async function connect(){
+  const url = $('#urlIn').value.trim();
+  if(!/^https:\/\/script\.google\.com\/.*\/exec/.test(url)){
+    $('#connectErr').innerHTML = `<div class="err">That doesn’t look like a web app URL. It should start with https://script.google.com and end with /exec.</div>`;
+    return;
+  }
+  const btn=$('#connectGo'); btn.disabled=true; btn.textContent='Connecting…';
+  const prev = {url:state.url, token:state.token, demo:state.demo};
+  state.url = url; state.token = $('#tokIn').value.trim(); state.demo = false;
+  try{
+    absorb(await api('list'));
+    store.set('olea_url', state.url); store.set('olea_token', state.token);
+    state.locked=false; state.loadedAt=new Date();
+    $('#live').classList.remove('off');
+    closeConnect(); showApp(); toast('Connected to your sheet');
+  }catch(err){
+    Object.assign(state, prev);
+    $('#connectErr').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+  }finally{ btn.disabled=false; btn.textContent='Connect'; }
+}
+
+function showApp(){ $('#app').hidden=false; $('#add').hidden=false; }
+
+/* ─────────────────────────  wiring  ───────────────────────── */
+$('#connectGo').addEventListener('click', connect);
+$('#urlIn').addEventListener('keydown', e=>{ if(e.key==='Enter') connect(); });
+const goDemo = ()=>{ state.demo=true; state.token=''; closeConnect(); showApp(); load(); };
+$('#connectDemo').addEventListener('click', goDemo);
+$('#lockDemo').addEventListener('click', goDemo);
+$('#lockGo').addEventListener('click', unlock);
+$('#lockIn').addEventListener('keydown', e=>{ if(e.key==='Enter') unlock(); });
+$('#acctDone').addEventListener('click', closeConnect);
+$('#acctForget').addEventListener('click', ()=>{
+  if(confirm('Forget the passcode on this device? You’ll need to type it in again.')) forget();
+});
+$('#settings').addEventListener('click', ()=>openConnect());
+$('#refresh').addEventListener('click', ()=>load());
+$('#add').addEventListener('click', ()=>openEditor(null));
+$('#cancel').addEventListener('click', closeSheet);
+$('#save').addEventListener('click', save);
+$('#scrim').addEventListener('click', closeSheet);
+$('#q').addEventListener('input', e=>{ state.query=e.target.value; renderList(); });
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ if($('#sheet').classList.contains('open')) closeSheet(); else if($('#connect').classList.contains('show') && state.items.length) closeConnect(); }
+});
+document.addEventListener('keydown', e=>{
+  if((e.key==='Enter'||e.key===' ') && e.target.classList?.contains('row')){ e.preventDefault(); e.target.click(); }
+});
+addEventListener('scroll', ()=>$('#bar').classList.toggle('stuck', scrollY>8), {passive:true});
+
+/* boot */
+(function(){
+  state.url = SCRIPT_URL || store.get('olea_url');
+  state.token = ACCESS_CODE || store.get('olea_token');
+  if(!state.url){ openConnect('setup'); return; }
+  showApp(); $('#app').classList.add('boot');
+  $('#list').innerHTML = `<div class="card" style="margin-top:26px"><div class="empty">
+    <h3>Opening your plan</h3><p>Fetching the latest from your sheet.</p></div></div>`;
+  load(true).then(()=>{ if(state.items.length) $('#live').classList.remove('off'); });
+})();
+</script>
+</body>
+</html>

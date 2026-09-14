@@ -1,0 +1,14 @@
+{
+  "name": "OLEA Move In",
+  "short_name": "Move In",
+  "description": "Furniture, appliance and delivery tracker for the new house.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f5",
+  "theme_color": "#f2f2f5",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
